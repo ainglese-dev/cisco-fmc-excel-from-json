@@ -35,7 +35,7 @@ row_index = 2
 
 ## Lectura de JSON
 
-with open('response_1623453929495.json') as json_file:
+with open('json-from-fmc.json') as json_file:
     data = json.load(json_file)
 
 ### Interación de cada uno de los ACL en el Policy
