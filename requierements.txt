@@ -1,3 +1,5 @@
 rich
 wheel
 XlsxWriter
+requests
+urllib3
