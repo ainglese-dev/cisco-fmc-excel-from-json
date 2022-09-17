@@ -1,19 +1,19 @@
+"""
+Main application to pull Access Control Policy from any FMC via API
+"""
 import json
 import base64
-from textwrap import indent
+from getpass import getpass
+from datetime import datetime
+from re import search
 from rich.console import Console
 from rich.table import Table
 import xlsxwriter
-import time
 import urllib3
-from getpass import getpass
 import requests
-from datetime import datetime
 from banner import banner
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# class FMC_domains:
 
 def get_token(uname, pword, fmc_ip):
     """
@@ -48,7 +48,8 @@ def get_fmc_apclist(auth_token, fmc_ip, fmc_domain):
     '''
     function to gather APC in a single domain under FMC
     '''
-    api_url = f'https://{fmc_ip}/api/fmc_config/v1/domain/{fmc_domain}/policy/accesspolicies?limit=100'
+    api_url = f'https://{fmc_ip}/api/fmc_config/v1/domain/{fmc_domain}/policy/\
+                accesspolicies?limit=100'
     http_headers = {'X-auth-access-token' : auth_token}
     response = requests.get( url = api_url, headers = http_headers, verify = False, timeout=5)
     if str(response.status_code) in ['404', '403', '401']:
@@ -61,7 +62,8 @@ def get_fmc_apc_rules(auth_token, fmc_ip, fmc_domain, apc_uuid):
     '''
     function to gather APC rules in a single domain under FMC
     '''
-    api_url = f'https://{fmc_ip}/api/fmc_config/v1/domain/{fmc_domain}/policy/accesspolicies/{apc_uuid}/accessrules?limit=60&expanded=true'
+    api_url = f'https://{fmc_ip}/api/fmc_config/v1/domain/{fmc_domain}/policy/\
+                accesspolicies/{apc_uuid}/accessrules?limit=60&expanded=true'
     http_headers = {'X-auth-access-token' : auth_token}
     response = requests.get( url = api_url, headers = http_headers, verify = False, timeout=5)
     if str(response.status_code) in ['404', '403', '401']:
@@ -106,36 +108,61 @@ def fmc_apcrules_list(fmc_apcrules):
     FMC APC rules table and user selection to print into CSV
     '''
     console = Console()
-    apcs_table = Table(title = 'Access Control Policy rules under FMC domain', expand = True)
-    apcs_table.add_column("Rule ID", justify="right", style="cyan", no_wrap=True)
-    apcs_table.add_column("Name", justify="right", style="green")
+    apcs_table = Table(title = 'Access Control Policy rules under FMC domain',
+                expand = True,
+                show_lines = True)
+    apcs_table.add_column("Rule ID", justify="center", style="cyan")
     apcs_table.add_column("Action", justify="right", style="green")
+    apcs_table.add_column("Name", justify="right", style="green")
     apcs_table.add_column("Src Zone", justify="right", style="green")
     apcs_table.add_column("Src Net", justify="right", style="green")
     apcs_table.add_column("Dst Zone", justify="right", style="green")
     apcs_table.add_column("Dst Net", justify="right", style="green")
 
-    # TODO: Add Section, Category, URL list, Src port, dst port, and features such as: comment, IPS Policy, File Policy, logging
-    # print(json.loads(fmcdomain_apcs))
-    for apc_rule in json.loads(fmc_apcrules)['items']:
-        apcs_table.add_row(apc2row(apc_rule))
+    # TODO: Add Section, Category, URL list, Src port, dst port, and features
+    # such as: comment, IPS Policy, File Policy, logging
+    for apc_rule in fmc_apcrules:
+        list_row = apc2row(apc_rule)
+        apcs_table.add_row(list_row[0],
+                            list_row[1], list_row[2], list_row[3],
+                            list_row[4], list_row[5], list_row[6])
     console.print(apcs_table)
-    # selectec_apc = input('\n++++ Select APC ID to pull from FMC: ')
 
 def apc2row(apc_rule):
-    pass
+    '''
+    creates a string which will be each row under a table
+    '''
+    returned_obj = [str(apc_rule['metadata']['ruleIndex']),
+    apc_rule['action'] + ' [green]:heavy_check_mark:',
+    apc_rule['name'],
+    'Any', 'Any', 'Any', 'Any']
+    if search('block', apc_rule['action'].lower()):
+        returned_obj[1] = '[red]:no_entry: ' + apc_rule['action']
+    if 'sourceZones' in apc_rule:
+        returned_obj[3] = rule_obj_extractor(apc_rule['sourceZones'])
+    if 'sourceNetworks' in apc_rule:
+        returned_obj[4] = rule_obj_extractor(apc_rule['sourceNetworks'])
+    if 'destinationZones' in apc_rule:
+        returned_obj[5] = rule_obj_extractor(apc_rule['destinationZones'])
+    if 'destinationNetworks' in apc_rule:
+        returned_obj[6] = rule_obj_extractor(apc_rule['destinationNetworks'])
+    # print(returned_obj)
+    return returned_obj
 
-def rule_obj_extractor(object):
+def rule_obj_extractor(obj2extract):
+    """
+    Function to extract particular objects from a nested rule
+    """
     returned_obj = ''
-    match object:
-        case object['sourceZones']:
-            for item in object['sourceZones']:
-                returned_obj.append(item['name'] + '\n')
-            return returned_obj
-        case _:
-            return 'Any'
+    if 'objects' in obj2extract:
+        for single_obj in obj2extract['objects']:
+            returned_obj += single_obj['name'] + '\n'
+    return returned_obj
 
 def workbook_xls():
+    """
+    Function to create an excel file workbook
+    """
     ## Definicion de Excel
 
     workbook = xlsxwriter.Workbook("latest_access_rules-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".xlsx")
@@ -158,11 +185,13 @@ def workbook_xls():
     worksheet.write("K1","App List", bold_format)
     worksheet.write("L1","Risk / Filters / Search", bold_format)
     worksheet.write("M1","Comments", bold_format)
-
     row_index = 2
     workbook.close()
 
 def main_fmc2csv():
+    """
+    Main function that will sort steps across the application
+    """
     print(banner)
     fmc_ip = input('++++ Insert FMC IP or FQDN: ')
     fmc_user = input('++++ Insert FMC Username: ')
@@ -171,13 +200,13 @@ def main_fmc2csv():
     # print(session_tkn)
     fmc_domains = get_fmc_domains(session_tkn[0], fmc_ip)
     selected_domain = fmc_domain_table(fmc_domains)
-    fmcdomain_apcs = get_fmc_apclist(session_tkn[0], fmc_ip, selected_domain) 
+    fmcdomain_apcs = get_fmc_apclist(session_tkn[0], fmc_ip, selected_domain)
     selected_domainapc = fmc_apcs_table(fmcdomain_apcs)
     fmcapc_rules = get_fmc_apc_rules(session_tkn[0], fmc_ip, selected_domain,selected_domainapc)
     fmc_apcrules_list(fmcapc_rules)
 # TODO: Collect all rules from FMC into a class
 # TODO: Define all parameters on each rule
 # TODO: Define all paramenters on a Access Policy, sections, global parameters
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     main_fmc2csv()
