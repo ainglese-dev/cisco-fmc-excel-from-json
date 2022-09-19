@@ -2,3 +2,4 @@ venv*
 .env
 json_examples
 __pycache__
+testing_*
