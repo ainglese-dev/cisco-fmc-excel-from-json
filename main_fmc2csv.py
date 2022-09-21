@@ -16,6 +16,10 @@ from banner import banner
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+def logging_json_files(fmc_operation, json_var):
+    with open(f"latest_json/{fmc_operation}_latest_json-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".json", "w") as outfile:
+        outfile.write(json_var)
+
 def get_token(uname, pword, fmc_ip):
     """
     Function to gather access token from FMC device
@@ -122,6 +126,8 @@ def fmc_apcrules_list(fmc_apcrules):
     apcs_table.add_column("Dst Net", justify="right", style="green") # 7
     apcs_table.add_column("Dst Ports", justify="right", style="green") # 8
     apcs_table.add_column("Comment history", justify="left", style="blue") # 9
+    apcs_table.add_column("IPS Policy", justify="left", style="red") # 10
+
     #print(type(json.loads(fmc_apcrules)))
     # print(json.dumps(fmc_apcrules, indent = 4))
     # TODO: Add Section, Category, URL list, Src port, dst port, and features
@@ -144,7 +150,8 @@ def fmc_apcrules_list(fmc_apcrules):
                             disabled_rule + list_row[6],
                             disabled_rule + list_row[7],
                             disabled_rule + list_row[8],
-                            disabled_rule + list_row[9])
+                            disabled_rule + list_row[9],
+                            disabled_rule + list_row[10])
     console.print(apcs_table)
 
 def apc2row(apc_rule):
@@ -155,7 +162,7 @@ def apc2row(apc_rule):
                      else str(apc_rule['metadata']['ruleIndex']) + '\n' + 'disabled',
                     apc_rule['action'] + ' [green]:heavy_check_mark:',
                     apc_rule['name'],
-                    'Any', 'Any', 'Any', 'Any','Any','Any', 'N/A']
+                    'Any', 'Any', 'Any', 'Any','Any','Any', 'N/A', 'N/A']
 
     if search('block', apc_rule['action'].lower()):
         returned_obj[1] = '[red]:no_entry: ' + apc_rule['action']
@@ -173,6 +180,8 @@ def apc2row(apc_rule):
         returned_obj[8] = rule_obj_extractor(apc_rule['destinationPorts'])
     if 'commentHistoryList' in apc_rule:
         returned_obj[9] = rule_obj_extractor(apc_rule)
+    if 'ipsPolicy' in apc_rule:
+        returned_obj[10] = apc_rule['ipsPolicy']['name'] + '\nMode: ' + apc_rule['ipsPolicy']['inspectionMode']
     # print(returned_obj)
     return returned_obj
 
@@ -186,7 +195,16 @@ def rule_obj_extractor(obj2extract):
             returned_obj += single_obj['name'] + '\n'
     if 'commentHistoryList' in obj2extract:
         for rule_comment in obj2extract['commentHistoryList']:
-            returned_obj += rule_comment['date'][:16] + ' ' + rule_comment['user']['name'] + ': ' + rule_comment['comment']
+            returned_obj += rule_comment['date'][:16] + ' ' + rule_comment['user']['name'] + ': ' + rule_comment['comment'] + '\n'
+    if 'literals' in obj2extract:
+        for literal in obj2extract['literals']:
+            try:
+                returned_obj += literal['type'] + ': ' + literal['value'] + '\n'
+            except:
+                if literal['protocol'] == '6':
+                    returned_obj += literal['type'] + ' TCP: ' + literal['port'] + '\n'
+                else:
+                    returned_obj += literal['type'] + ' UDP:' + literal['port'] + '\n'
     return returned_obj
 
 def workbook_xls():
@@ -225,16 +243,19 @@ def main_fmc2csv():
     print(banner)
     fmc_ip = 'fmcrestapisandbox.cisco.com' ## Default
     fmc_ip = input(f'++++ Insert FMC IP or FQDN [{fmc_ip}]: ') or fmc_ip
-    fmc_user = input('++++ Insert FMC Username: ') # or 'ingleseang'
-    fmc_pass = getpass('++++ Insert FMC user password: ') # or 'DA8yne9D'
+    fmc_user = input('++++ Insert FMC Username: ') or 'ingleseang'
+    fmc_pass = getpass('++++ Insert FMC user password: ') or 'HQyjy24a'
     session_tkn = get_token(uname=fmc_user, pword=fmc_pass, fmc_ip=fmc_ip)
     # print(session_tkn)
     fmc_domains = get_fmc_domains(session_tkn[0], fmc_ip)
+    # logging_json_files('fmc_domains', fmc_domains)
     # print(fmc_domains)
     selected_domain = fmc_domain_table(fmc_domains)
     fmcdomain_apcs = get_fmc_apclist(session_tkn[0], fmc_ip, selected_domain)
+    # logging_json_files('fmcdomain_apcs', fmcdomain_apcs)
     selected_domainapc = fmc_apcs_table(fmcdomain_apcs)
     fmcapc_rules = get_fmc_apc_rules(session_tkn[0], fmc_ip, selected_domain,selected_domainapc)
+    # logging_json_files('fmcapc_rules', fmcapc_rules)
     fmc_apcrules_list(json.loads(fmcapc_rules)['items'])
 # TODO: Collect all rules from FMC into a class
 # TODO: Define all parameters on each rule

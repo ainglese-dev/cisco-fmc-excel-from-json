@@ -3,3 +3,5 @@ venv*
 json_examples
 __pycache__
 testing_*
+testing_acp.py
+*.json
