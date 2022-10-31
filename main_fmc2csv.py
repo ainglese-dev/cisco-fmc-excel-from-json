@@ -19,7 +19,9 @@ def logging_json_files(fmc_operation, json_var):
     """
     Logging for all activies across all operations
     """
-    with open(f"latest_json/{fmc_operation}_latest_json-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".json", "w") as outfile:
+    with open(f"latest_json/{fmc_operation}_latest_json-" +\
+        datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") +\
+        ".json", "w", encoding='utf-8') as outfile:
         outfile.write(json_var)
 
 def get_token(uname, pword, fmc_ip):
@@ -88,8 +90,7 @@ def fmc_domain_table(fmc_domains):
     for fmc_domain in json.loads(fmc_domains)['items']:
         domain_table.add_row(fmc_domain['name'], fmc_domain['uuid'])
     console.print(domain_table)
-    selected_domain = input('\n++++ Select Domain UUID to pull from FMC: ') or 'e276abec-e0f2-11e3-8169-6d9ed49b625f'
-    # TODO: if selected domain is ALL, display APC per domain
+    selected_domain = input('\n++++ Select Domain UUID to pull from FMC: ')
     return selected_domain
 
 def fmc_apcs_table(fmcdomain_apcs):
@@ -97,7 +98,9 @@ def fmc_apcs_table(fmcdomain_apcs):
     FMC APC table and user selection
     '''
     console = Console()
-    apcs_table = Table(title = 'Access Control Policy under FMC domain', expand = True, show_lines = True)
+    apcs_table = Table(title = 'Access Control Policy under FMC domain',
+                    expand = True,
+                    show_lines = True)
     apcs_table.add_column("APC name", justify="right", style="cyan", no_wrap=True)
     apcs_table.add_column("UUID", justify="right", style="green")
     # print(json.loads(fmcdomain_apcs))
@@ -106,8 +109,8 @@ def fmc_apcs_table(fmcdomain_apcs):
     for fmc_apc in json.loads(fmcdomain_apcs)['items']:
         apcs_table.add_row(fmc_apc['name'], fmc_apc['id'])
     console.print(apcs_table)
-    selectec_apc = input('\n++++ Select APC ID to pull from FMC: ') or '005056BF-7C6E-0ed3-0000-244813702083'
-    # TODO: if selected APC is ALL, display APC per domain
+    selectec_apc = input('\n++++ Select APC ID to pull from FMC: ')
+        # TODO: if selected domain is ALL, display APC per domain
     return selectec_apc
 
 def fmc_apcrules_list(fmc_apcrules):
@@ -134,8 +137,6 @@ def fmc_apcrules_list(fmc_apcrules):
     xls_worksheet = []
     #print(type(json.loads(fmc_apcrules)))
     # print(json.dumps(fmc_apcrules, indent = 4))
-    # TODO: Add Section, Category, URL list, Src port, dst port, and features
-    # such as: comment, IPS Policy, File Policy, logging
     for apc_rule in fmc_apcrules:
         # print(type(apc_rule))
         # print(apc_rule)
@@ -183,18 +184,20 @@ def apc2row(apc_rule):
     '''
     creates a string which will be each row under a table
     '''
-    returned_obj = [str(apc_rule['metadata']['ruleIndex']) + '\n' + '[green]enabled' if apc_rule['enabled']\
+    returned_obj = [str(apc_rule['metadata']['ruleIndex']) + '\n' +\
+                    '[green]enabled' if apc_rule['enabled']\
                      else str(apc_rule['metadata']['ruleIndex']) + '\n' + 'disabled',
                     apc_rule['action'] + ' [green]:heavy_check_mark:',
                     apc_rule['name'],
                     'Any', 'Any', 'Any', 'Any','Any','Any', 'N/A', 'N/A']
-    xls_returned_obj = [str(apc_rule['metadata']['ruleIndex']) + '\nenabled' if apc_rule['enabled']\
+    xls_returned_obj = [str(apc_rule['metadata']['ruleIndex']) +\
+                    '\nenabled' if apc_rule['enabled']\
                      else str(apc_rule['metadata']['ruleIndex']) + '\ndisabled',
                     apc_rule['action'],
                     apc_rule['name'],
                     'Any', 'Any', 'Any', 'Any','Any','Any', 'N/A', 'N/A']
     # For emojis I'm using https://gist.github.com/rxaviers/7360908 for reference
-    # for colors I follow rich standar colors list at https://rich.readthedocs.io/en/stable/appendix/colors.html
+    # colors I follow rich colors list https://rich.readthedocs.io/en/stable/appendix/colors.html
     if search('block', apc_rule['action'].lower()):
         xls_returned_obj[1] = apc_rule['action']
         returned_obj[1] = '[red]:no_entry: ' + apc_rule['action']
@@ -219,7 +222,8 @@ def apc2row(apc_rule):
     if 'commentHistoryList' in apc_rule:
         xls_returned_obj[9] = returned_obj[9] = rule_obj_extractor(apc_rule)
     if 'ipsPolicy' in apc_rule:
-        xls_returned_obj[10] = returned_obj[10] = apc_rule['ipsPolicy']['name'] + '\nMode: ' + apc_rule['ipsPolicy']['inspectionMode']
+        xls_returned_obj[10] = returned_obj[10] = apc_rule['ipsPolicy']['name'] +\
+                                '\nMode: ' + apc_rule['ipsPolicy']['inspectionMode']
     # print(returned_obj)
     return [returned_obj, xls_returned_obj]
 
@@ -242,7 +246,9 @@ def rule_obj_extractor(obj2extract):
                     returned_obj += literal['type'] + ' UDP:' + literal['port'] + '\n'
     if 'commentHistoryList' in obj2extract:
         for rule_comment in obj2extract['commentHistoryList']:
-            returned_obj += rule_comment['date'][:16] + ' ' + rule_comment['user']['name'] + ': ' + rule_comment['comment'] + '\n'
+            returned_obj += rule_comment['date'][:16] + ' ' + \
+                            rule_comment['user']['name'] + ': ' +\
+                            rule_comment['comment'] + '\n'
 
     return returned_obj
 
@@ -252,8 +258,8 @@ def workbook_xls(simple_table):
     """
     ## Definicion de Excel
 
-    workbook = xlsxwriter.Workbook("outputs/latest_access_rules-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".xlsx")
-    bold_format = workbook.add_format({'bold': True})
+    workbook = xlsxwriter.Workbook("outputs/latest_access_rules-" +\
+                datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".xlsx")
     cell_format = workbook.add_format()
     cell_format.set_align('center')
     cell_format.set_align('top')
@@ -271,7 +277,6 @@ def workbook_xls(simple_table):
                             {'header': "IPS Policy"}]
     worksheet.add_table("B2:K" + str(len(simple_table)),
             {"data": simple_table, 'columns': worksheet_header_row})
-    
     workbook.close()
 
 def main_fmc2csv():
@@ -297,9 +302,6 @@ def main_fmc2csv():
     fmcapc_rules = get_fmc_apc_rules(session_tkn[0], fmc_ip, selected_domain,selected_domainapc)
     # logging_json_files('fmcapc_rules', fmcapc_rules)
     fmc_apcrules_list(json.loads(fmcapc_rules)['items'])
-# TODO: Collect all rules from FMC into a class
-# TODO: Define all parameters on each rule
-# TODO: Define all paramenters on a Access Policy, sections, global parameters
 
 if __name__ == "__main__":
     main_fmc2csv()
