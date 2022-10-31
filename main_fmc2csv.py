@@ -6,7 +6,6 @@ import base64
 from getpass import getpass
 from datetime import datetime
 from re import search
-from tkinter import N
 from rich.console import Console
 from rich.table import Table
 import xlsxwriter
@@ -17,6 +16,9 @@ from banner import banner
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def logging_json_files(fmc_operation, json_var):
+    """
+    Logging for all activies across all operations
+    """
     with open(f"latest_json/{fmc_operation}_latest_json-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".json", "w") as outfile:
         outfile.write(json_var)
 
@@ -112,7 +114,7 @@ def fmc_apcrules_list(fmc_apcrules):
     '''
     FMC APC rules table and user selection to print into CSV
     '''
-    console = Console()
+    # console = Console()
     apcs_table = Table(title = 'Access Control Policy rules under FMC domain',
                 # expand = True,
                 show_lines = True)
@@ -128,6 +130,8 @@ def fmc_apcrules_list(fmc_apcrules):
     apcs_table.add_column("Comment history", justify="left", style="blue") # 9
     apcs_table.add_column("IPS Policy", justify="left", style="red") # 10
 
+    #Excel definition into a list variable
+    xls_worksheet = []
     #print(type(json.loads(fmc_apcrules)))
     # print(json.dumps(fmc_apcrules, indent = 4))
     # TODO: Add Section, Category, URL list, Src port, dst port, and features
@@ -135,7 +139,7 @@ def fmc_apcrules_list(fmc_apcrules):
     for apc_rule in fmc_apcrules:
         # print(type(apc_rule))
         # print(apc_rule)
-        list_row = apc2row(apc_rule)
+        list_row, xls_list_row = apc2row(apc_rule)
         # print(list_row)
         # print(type(list_row))
         disabled_rule = ''
@@ -152,7 +156,28 @@ def fmc_apcrules_list(fmc_apcrules):
                             disabled_rule + list_row[8],
                             disabled_rule + list_row[9],
                             disabled_rule + list_row[10])
-    console.print(apcs_table)
+        xls_worksheet.append([xls_list_row[0], #A
+                                xls_list_row[1],#B
+                                xls_list_row[2],#C
+                                xls_list_row[3],#D
+                                xls_list_row[4],#E
+                                xls_list_row[5],#F
+                                xls_list_row[6],#G
+                                xls_list_row[7],#H
+                                xls_list_row[8],#I
+                                xls_list_row[9],#J
+                                xls_list_row[10]])#K
+    # print(type(apcs_table))
+    print_to_svg(apcs_table)
+    workbook_xls(xls_worksheet)
+
+def print_to_svg(rich_table):
+    """
+    Function to print generic table to SVG file
+    """
+    console = Console(record=True)
+    console.print(rich_table)
+    console.save_svg("outputs/APCs_table.svg", title="APCs_table.py")
 
 def apc2row(apc_rule):
     '''
@@ -163,27 +188,40 @@ def apc2row(apc_rule):
                     apc_rule['action'] + ' [green]:heavy_check_mark:',
                     apc_rule['name'],
                     'Any', 'Any', 'Any', 'Any','Any','Any', 'N/A', 'N/A']
-
+    xls_returned_obj = [str(apc_rule['metadata']['ruleIndex']) + '\nenabled' if apc_rule['enabled']\
+                     else str(apc_rule['metadata']['ruleIndex']) + '\ndisabled',
+                    apc_rule['action'],
+                    apc_rule['name'],
+                    'Any', 'Any', 'Any', 'Any','Any','Any', 'N/A', 'N/A']
+    # For emojis I'm using https://gist.github.com/rxaviers/7360908 for reference
+    # for colors I follow rich standar colors list at https://rich.readthedocs.io/en/stable/appendix/colors.html
     if search('block', apc_rule['action'].lower()):
+        xls_returned_obj[1] = apc_rule['action']
         returned_obj[1] = '[red]:no_entry: ' + apc_rule['action']
+    if search('trust', apc_rule['action'].lower()):
+        xls_returned_obj[1] = apc_rule['action']
+        returned_obj[1] = '[blue]:arrow_upper_right: ' + apc_rule['action']
+    if search('monitor', apc_rule['action'].lower()):
+        xls_returned_obj[1] = apc_rule['action']
+        returned_obj[1] = '[grey37]:arrow_forward: ' + apc_rule['action']
     if 'sourceZones' in apc_rule:
-        returned_obj[3] = rule_obj_extractor(apc_rule['sourceZones'])
+        xls_returned_obj[3] = returned_obj[3] = rule_obj_extractor(apc_rule['sourceZones'])
     if 'sourceNetworks' in apc_rule:
-        returned_obj[4] = rule_obj_extractor(apc_rule['sourceNetworks'])
+        xls_returned_obj[4] = returned_obj[4] = rule_obj_extractor(apc_rule['sourceNetworks'])
     if 'sourcePorts' in apc_rule:
-        returned_obj[5] = rule_obj_extractor(apc_rule['sourcePorts'])
+        xls_returned_obj[5] = returned_obj[5] = rule_obj_extractor(apc_rule['sourcePorts'])
     if 'destinationZones' in apc_rule:
-        returned_obj[6] = rule_obj_extractor(apc_rule['destinationZones'])
+        xls_returned_obj[6] = returned_obj[6] = rule_obj_extractor(apc_rule['destinationZones'])
     if 'destinationNetworks' in apc_rule:
-        returned_obj[7] = rule_obj_extractor(apc_rule['destinationNetworks'])
+        xls_returned_obj[7] = returned_obj[7] = rule_obj_extractor(apc_rule['destinationNetworks'])
     if 'destinationPorts' in apc_rule:
-        returned_obj[8] = rule_obj_extractor(apc_rule['destinationPorts'])
+        xls_returned_obj[8] = returned_obj[8] = rule_obj_extractor(apc_rule['destinationPorts'])
     if 'commentHistoryList' in apc_rule:
-        returned_obj[9] = rule_obj_extractor(apc_rule)
+        xls_returned_obj[9] = returned_obj[9] = rule_obj_extractor(apc_rule)
     if 'ipsPolicy' in apc_rule:
-        returned_obj[10] = apc_rule['ipsPolicy']['name'] + '\nMode: ' + apc_rule['ipsPolicy']['inspectionMode']
+        xls_returned_obj[10] = returned_obj[10] = apc_rule['ipsPolicy']['name'] + '\nMode: ' + apc_rule['ipsPolicy']['inspectionMode']
     # print(returned_obj)
-    return returned_obj
+    return [returned_obj, xls_returned_obj]
 
 def rule_obj_extractor(obj2extract):
     """
@@ -192,10 +230,7 @@ def rule_obj_extractor(obj2extract):
     returned_obj = ''
     if 'objects' in obj2extract:
         for single_obj in obj2extract['objects']:
-            returned_obj += single_obj['name'] + '\n'
-    if 'commentHistoryList' in obj2extract:
-        for rule_comment in obj2extract['commentHistoryList']:
-            returned_obj += rule_comment['date'][:16] + ' ' + rule_comment['user']['name'] + ': ' + rule_comment['comment'] + '\n'
+            returned_obj += 'obj: ' + single_obj['name'] + '\n'
     if 'literals' in obj2extract:
         for literal in obj2extract['literals']:
             try:
@@ -205,35 +240,38 @@ def rule_obj_extractor(obj2extract):
                     returned_obj += literal['type'] + ' TCP: ' + literal['port'] + '\n'
                 else:
                     returned_obj += literal['type'] + ' UDP:' + literal['port'] + '\n'
+    if 'commentHistoryList' in obj2extract:
+        for rule_comment in obj2extract['commentHistoryList']:
+            returned_obj += rule_comment['date'][:16] + ' ' + rule_comment['user']['name'] + ': ' + rule_comment['comment'] + '\n'
+
     return returned_obj
 
-def workbook_xls():
+def workbook_xls(simple_table):
     """
     Function to create an excel file workbook
     """
     ## Definicion de Excel
 
-    workbook = xlsxwriter.Workbook("latest_access_rules-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".xlsx")
+    workbook = xlsxwriter.Workbook("outputs/latest_access_rules-" + datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p") + ".xlsx")
     bold_format = workbook.add_format({'bold': True})
     cell_format = workbook.add_format()
     cell_format.set_align('center')
     cell_format.set_align('top')
     worksheet = workbook.add_worksheet("AccessRules")
-
-    worksheet.write("A1","RID", bold_format)
-    worksheet.write("B1","Rule Name", bold_format)
-    worksheet.write("C1","Enabled", bold_format)
-    worksheet.write("D1","Rule Action", bold_format)
-    worksheet.write("E1","Source Zone", bold_format)
-    worksheet.write("F1","Source Network", bold_format)
-    worksheet.write("G1","destination Zone", bold_format)
-    worksheet.write("H1","Destination Network", bold_format)
-    worksheet.write("I1","Destination ports", bold_format)
-    worksheet.write("J1","Users", bold_format)
-    worksheet.write("K1","App List", bold_format)
-    worksheet.write("L1","Risk / Filters / Search", bold_format)
-    worksheet.write("M1","Comments", bold_format)
-    row_index = 2
+    worksheet_header_row = [{'header': "Rule ID / State"},
+                            {'header': "Action"},
+                            {'header': "Name"},
+                            {'header': "Src Zone"},
+                            {'header': "Src Net"},
+                            {'header': "Src Ports"},
+                            {'header': "Dst Zone"},
+                            {'header': "Dst Net"},
+                            {'header': "Dst Ports"},
+                            {'header': "Comment history"},
+                            {'header': "IPS Policy"}]
+    worksheet.add_table("B2:K" + str(len(simple_table)),
+            {"data": simple_table, 'columns': worksheet_header_row})
+    
     workbook.close()
 
 def main_fmc2csv():
@@ -241,10 +279,12 @@ def main_fmc2csv():
     Main function that will sort steps across the application
     """
     print(banner)
-    fmc_ip = 'fmcrestapisandbox.cisco.com' ## Default
-    fmc_ip = input(f'++++ Insert FMC IP or FQDN [{fmc_ip}]: ') or fmc_ip
-    fmc_user = input('++++ Insert FMC Username: ') or 'ingleseang'
-    fmc_pass = getpass('++++ Insert FMC user password: ') or 'HQyjy24a'
+    fmc_ip_pred = ['fmcrestapisandbox.cisco.com','fmc.domain.com'] ## Default
+    fmc_user_pred = ['ingleseang', 'FMC-user']
+    fmc_pass_pred = ['n2cxmhG8', 'password']
+    fmc_ip = input(f'++++ Insert FMC IP or FQDN [{fmc_ip_pred[0]}]: ') or fmc_ip_pred[0]
+    fmc_user = input('++++ Insert FMC Username: ') or fmc_user_pred[0]
+    fmc_pass = getpass('++++ Insert FMC user password: ') or fmc_pass_pred[0]
     session_tkn = get_token(uname=fmc_user, pword=fmc_pass, fmc_ip=fmc_ip)
     # print(session_tkn)
     fmc_domains = get_fmc_domains(session_tkn[0], fmc_ip)
