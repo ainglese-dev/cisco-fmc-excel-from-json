@@ -1,4 +1,7 @@
 # Cisco FMC Excel and SVG from Firepower API
+
+[![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/AngelIV23/cisco-fmc-excel-from-json)
+
 ![Script Result](images/APCs_table.svg)
 # Installation for debian-based OS
 Virtual Environment
