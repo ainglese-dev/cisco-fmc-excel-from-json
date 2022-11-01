@@ -15,7 +15,7 @@ Activate (use) your new virtual environment (Linux):
 ``` console
 source myvenv/bin/activate
 ```
-Download or clone the mind_nmap repository:
+Download or clone the cisco-fmc-excel-from-json repository:
 
 ``` console
 git clone https://github.com/AngelIV23/cisco-fmc-excel-from-json.git
